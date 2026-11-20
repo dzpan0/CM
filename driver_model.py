@@ -170,7 +170,7 @@ def plotTrialResults(locPos, locColor, trialTime, resultDir, plotId, interleavin
     plt.ylabel("Lane position (m)")
     plt.title(f"Total trial time = {trialTime:.0f} ms; Mean position on the road = {meanPos:.3f} m; "
               f"Max position on the road (absolute) = {maxPos:.3f} m", fontsize=8)
-    plt.savefig(resultDir / f"{interleaving}_trial_{plotId}.png", dpi=300)
+    plt.savefig(resultDir / f"{interleaving}_trial_{0 if plotId < 10 else ''}{plotId}.png", dpi=300)
     
     
 ### Function to run a trial. Needs to be defined by students (section 2 and 3 of assignment)
