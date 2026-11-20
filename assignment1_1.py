@@ -2,11 +2,14 @@
 #“start”, “perceptualstep”, “cognitivestep”, and “motorstep”. The functions 
 #have no input and return as output the time this step took in milliseconds 
 
+import matplotlib.pyplot as plt
+
 _error_multiplication_factors = {
      "f": 3,
      "m": 2,
      "s": 0.5,
 }
+
 
 def perceptualstep(mode, error_rate):
     if mode == "f":
@@ -74,7 +77,6 @@ def example4():
     return total
 
 def example5():
-    error_rate = 0.01
     total_times = []
     error_rates = []
     speed_options = ["f", "m", "s"]
@@ -82,11 +84,28 @@ def example5():
     for perceptual in speed_options:
         for cognitive in speed_options:
              for motor in speed_options:
+                error_rate = 0.01
                 tp, error_rate = perceptualstep(perceptual, error_rate)
                 tp2, error_rate = perceptualstep(perceptual, error_rate)
                 tc, error_rate = cognitivestep(cognitive, error_rate)
                 tc2, error_rate = cognitivestep(cognitive, error_rate)
                 tm, error_rate = motorstep(motor, error_rate)
                 total_times.append(tp + tp2 + tc + tc2 + tm)
+                
+                if error_rate > 1:
+                    error_rate = 1
+                    
                 error_rates.append(error_rate)
+    
+    print("Total Times:", total_times)
+    print("Error Rates:", error_rates)
+                
+    plt.scatter(total_times, error_rates)
+    plt.xlabel("Total Time (ms)")
+    plt.ylabel("Error Rate")
+    plt.title("Performance of Different Speed Options")
+    plt.savefig("section1_performance_plot.png")
+    plt.close()
+    
+example5()
     
