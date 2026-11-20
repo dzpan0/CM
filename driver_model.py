@@ -14,8 +14,10 @@
 ### import packages
 ###
 
+from pathlib import Path
+
 import numpy
-import matplotlib as plt
+import matplotlib.pyplot as plt
 
 
 ###
@@ -142,87 +144,106 @@ def vehicleUpdateActiveSteering(LD):
 
 ### function to update lateral deviation in cases where the driver is NOT steering actively (when they are distracted by typing for example). Draw a value from a random distribution. This can be added to the position where the car is already.
 def vehicleUpdateNotSteering():
-    
     global gaussDeviateMean
     global gaussDeviateSD 
-
-    
 
     vals = numpy.random.normal(loc=gaussDeviateMean, scale=gaussDeviateSD,size=1)[0]
     returnValue = velocityCheckForVectors(vals)
     return returnValue   ### in m/s
 
 
+def plotTrialResults(locPos, locColor, trialTime, resultDir, plotId, interleaving):
+    plt.figure(figsize=(25, 5))
+    times = numpy.arange(len(locPos)) * timeStepPerDriftUpdate
+    meanPos = numpy.mean(numpy.abs(locPos))
+    maxPos = numpy.max(numpy.abs(locPos))
+    locPosArr = numpy.array(locPos)
+    colorArr = numpy.array(locColor)
+    labels = {"green": "Start position", "red": "Typing (drift)", "blue": "Steering"}
 
-# Lane deviation, right is positive, left is negative
+    for color, label in labels.items():
+        mask = colorArr == color
+        plt.scatter(times[mask], locPosArr[mask], c=color, s=2, label=label)
 
-
+    plt.legend(loc="best")
+    plt.xlabel("Time (ms)")
+    plt.ylabel("Lane position (m)")
+    plt.title(f"Total trial time = {trialTime:.0f} ms; Mean position on the road = {meanPos:.3f} m; "
+              f"Max position on the road (absolute) = {maxPos:.3f} m", fontsize=8)
+    plt.savefig(resultDir / f"{interleaving}_trial_{plotId}.png", dpi=300)
+    
+    
 ### Function to run a trial. Needs to be defined by students (section 2 and 3 of assignment)
-
-def runTrial(nrWordsPerSentence =5,nrSentences=3,nrSteeringMovementsWhenSteering=2, interleaving="word"): 
-    strategy = "WORD"
-
+def runTrial(resultDir, plotId, nrWordsPerSentence=17, nrSentences=10, nrSteeringMovementsWhenSteering=4,
+             interleaving="word", directionalSteering=False): 
+    def updateTrialActiveSteering():
+        nonlocal locPos, locColor, trialTime
+        
+        for _ in range(nrSteeringMovementsWhenSteering):
+            distanceSteering = vehicleUpdateActiveSteering(abs(locPos[-1])) * 0.25
+            
+            for _ in range(int(steeringUpdateTime / timeStepPerDriftUpdate)):
+                if directionalSteering:
+                    direction = -1 if locPos[-1] > 0 else 1
+                    distanceSteering *= direction
+                    
+                newPos = locPos[-1] - (distanceSteering / 5)
+                locPos.append(newPos)
+                locColor.append("blue")
+                
+            trialTime += 250
+            
+    def updateTrialNotSteering(nrUpdates):
+        nonlocal locPos, locColor, trialTime
+        
+        for _ in range(nrUpdates):
+            drift = vehicleUpdateNotSteering() * 0.05
+            newPos = locPos[-1]
+            
+            if directionalSteering:
+                newPos += drift
+            else:
+                newPos += abs(drift)
+                
+            locPos.append(newPos)
+            locColor.append("red")
+    
+          
     resetParameters()
-
-    locPos = [] #measured in meters
-    trialTime = None #measured in miliseconds
-    locColor = ["yellow"]
-
-    if strategy ==  "WORD":
-        pass
-
-    trialTime = 0
-    locPos.append(startingPositionInLane)
-
-    typing_speed = numpy.random.normal(wordsPerMinuteMean, wordsPerMinuteSD)
+    locPos = [startingPositionInLane] #measured in meters
+    trialTime = 0 #measured in miliseconds
+    locColor = ["green"]
+    wordsPerMinute = numpy.random.normal(wordsPerMinuteMean, wordsPerMinuteSD)
+    timePerWord = 60000 / wordsPerMinute
 
     for s in range(nrSentences):
-        for w in range(nrWordsPerSentence):
-            #9
-            timePerWord = typing_speed
-            if w == 0:
-                time_word = retrievalTimeWord + retrievalTimeSentence
-
-            else:
-                time_word = retrievalTimeWord
-            
-            time_no_attention = timePerWord + time_word
-            updates = numpy.floor(time_no_attention / 50)
-
-            for t in range(updates):
-                drift = vehicleUpdateNotSteering() * 0.05
-                newPos = locPos[-1] + drift
-                locPos.append(newPos)
-                locColor.append("red")
-                trialTime += 50
-
-            #10 multiply with -1 for left movement
-            if s == nrSentences - 1 and w == nrWordsPerSentence - 1: # don't steer for the final word
-                break
-
-            for u in range(nrSteeringMovementsWhenSteering):
-                if locPos[-1] > 0: # if LD is positive you need to move to the left so multiply with -1
-                    direction = -1
+        if interleaving == "word":
+            for w in range(nrWordsPerSentence):
+                if w == 0:
+                    timeNoAttention = retrievalTimeSentence + retrievalTimeWord + timePerWord
                 else:
-                    direction = 1
-                distance_steering = vehicleUpdateActiveSteering(locPos[-1]) * 0.25 * direction
-                for i in range(5):
-                    newPos = (distance_steering / 5) + locPos[-1]
-                    locPos.append(newPos)
-                    locColor.append("blue")
-                trialTime += 250
-    trial_times = list(range(0, len(locPos)*50 + 1, 50))
-    plt.scatter(trial_times, locPos)
-    plt.show()
+                    timeNoAttention = retrievalTimeWord + timePerWord
 
+                trialTime += timeNoAttention
+                nrUpdates = int(timeNoAttention / timeStepPerDriftUpdate)
+                updateTrialNotSteering(nrUpdates)
+                
+                if s == nrSentences - 1 and w == nrWordsPerSentence - 1:   # don't steer for the final word
+                    break
+                
+                updateTrialActiveSteering()
+        elif interleaving == "sentence":
+            timeNoAttention = retrievalTimeSentence + (nrWordsPerSentence * timePerWord)
+            trialTime += timeNoAttention
+            nrUpdates = int(timeNoAttention / timeStepPerDriftUpdate)
+            updateTrialNotSteering(nrUpdates)
             
-runTrial()
-
-
-
-	
-
-
+            if s == nrSentences - 1:   # don't steer for the final sentence
+                break
+            
+            updateTrialActiveSteering()
+                
+    plotTrialResults(locPos, locColor, trialTime, resultDir, plotId, interleaving)
 
 
 ### function to run multiple simulations. Needs to be defined by students (section 3 of assignment)
@@ -230,9 +251,14 @@ def runSimulations(nrSims = 100):
     print("hello world")
 
 
-
-	
-
-
-
-
+def main():
+    result_dir = Path("results/section2")
+    result_dir.mkdir(parents=True, exist_ok=True)
+    
+    for plot_id in range(1, 11):
+        runTrial(resultDir=result_dir, plotId=plot_id, interleaving="word")
+        runTrial(resultDir=result_dir, plotId=plot_id, interleaving="sentence")
+    
+    
+if __name__ == "__main__":
+    main()
