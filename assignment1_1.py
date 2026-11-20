@@ -2,6 +2,8 @@
 #“start”, “perceptualstep”, “cognitivestep”, and “motorstep”. The functions 
 #have no input and return as output the time this step took in milliseconds 
 
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 
 _error_multiplication_factors = {
@@ -99,12 +101,15 @@ def example5():
     
     print("Total Times:", total_times)
     print("Error Rates:", error_rates)
+    
+    result_dir = Path("results/section1")
+    result_dir.mkdir(parents=True, exist_ok=True)
                 
     plt.scatter(total_times, error_rates)
     plt.xlabel("Total Time (ms)")
     plt.ylabel("Error Rate")
     plt.title("Performance of Different Speed Options")
-    plt.savefig("section1_performance_plot.png")
+    plt.savefig(result_dir / "performance_plot.png", dpi=300)
     plt.close()
     
 example5()
